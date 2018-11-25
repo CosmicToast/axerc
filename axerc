@@ -99,7 +99,7 @@ run_wayland() {
 # $@: arguments to pass to xinitrc
 run_xorg() {
     [ ! -z "$axeprof" ] && env_xprofile
-    xorg
+    env_xorg
     exec xinit "$@"
 }
 

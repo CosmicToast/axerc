@@ -1,0 +1,158 @@
+#!/bin/sh
+
+# --- functions
+# -- internal use
+die() {
+    echo "$@"
+    exit 1
+}
+
+# -- environment
+env_xdg() {
+    : ${XDG_DATA_HOME:=~/.local/share}
+    : ${XDG_CONFIG_HOME:=~/.config}
+    : ${XDG_DATA_DIRS:=/usr/local/share:/usr/share}
+    : ${XDG_CONFIG_DIRS:=/etc/xdg}
+    : ${XDG_CACHE_HOME:=~/.cache}
+    : ${XDG_RUNTIME_DIR:=not_valid}
+    if [ "$XDG_RUNTIME_DIR" = "not_valid" ]; then
+        echo "Warning: XDG_RUNTIME_DIR is not provided."
+        XDG_RUNTIME_DIR=/tmp/axerc-$(id -u)
+        # since we're managing it, there's no guarantee upstream cleaned up the old one
+        rm -rf $XDG_RUNTIME_DIR
+        mkdir -m 1700 $XDG_RUNTIME_DIR # sticky - downstream may want persistence
+    fi
+}
+
+env_wayland() {
+    export XDG_SESSION_TYPE=wayland
+
+    : ${GDK_BACKEND:=wayland}
+    : ${QT_QPA_PLATFORM:=wayland-egl}
+    : ${CLUTTER_BACKEND:=wayland}
+    : ${SDL_VIDEODRIVER:=wayland}
+    : ${ECORE_EVAS_ENGINE:=wayland_egl}
+    : ${ELM_DISPLAY:=wl}
+    : ${ELM_ACCEL:=wayland_egl}
+
+    export GDK_BACKEND \
+        QT_QPA_PLATFORM \
+        CLUTTER_BACKEND \
+        SDL_VIDEODRIVER \
+        ECORE_EVAS_ENGINE ELM_DISPLAY ELM_ACCEL
+}
+
+env_xorg() {
+    export XDG_SESSION_TYPE=x11
+
+    : ${GDK_BACKEND:=x11}
+    : ${QT_QPA_PLATFORM:=xcb}
+    : ${CLUTTER_BACKEND:=x11}
+    : ${SDL_VIDEODRIVER:=x11}
+    : ${ELM_DISPLAY:=x11}
+    : ${ELM_ACCEL:=gl}
+
+    export GDK_BACKEND \
+        QT_QPA_PLATFORM \
+        CLUTTER_BACKEND \
+        SDL_VIDEODRIVER \
+        ELM_DISPLAY ELM_ACCEL
+}
+
+env_dbus() {
+    export $(dbus-launch)
+}
+
+# $1: the input module you use, e.g ibus
+env_input() {
+    [ $# -ge 1 ] || die "env_input requires an argument"
+    export IM_MODULE="$1" # for xinitrc
+    export GDK_IM_MODULE="$IM_MODULE"
+    export QT_IM_MODULE="$IM_MODULE"
+    export XMODIFIERS=@im=$"IM_MODULE"
+}
+
+env_profile() {
+    for file in ~/.profile /etc/profile
+    do
+        . $file
+    done
+}
+
+env_xprofile() {
+    for file in  ~/.xprofile /etc/xprofile
+    do
+        . $file
+    done
+}
+
+# -- execution
+# $1: wayland startup script to run
+run_wayland() {
+    [ $# -ge 1 ] || die "run_wayland requires an argument"
+    wm="$1"
+    shift
+    env_wayland
+    exec $wm "$@"
+}
+
+# $@: arguments to pass to xinitrc
+run_xorg() {
+    [ ! -z "$axeprof" ] && env_xprofile
+    xorg
+    exec xinit "$@"
+}
+
+# --- main program
+
+usage() {
+    echo "$0 [-d dir] [-r rc] [-x xinitrc] [-p] ARGS"
+}
+
+# axed: override configuration directory
+# axerc: override rc file
+# XINITRC: override xinitrc file used
+# axeprof: source various profile directories in place of rc file
+vars() {
+    : ${axed:=$XDG_CONFIG_HOME/axerc}
+    : ${axerc:=$axed/axerc}
+    : ${XINITRC:=$axed/xinitrc}
+    : ${axeprof:=}
+}
+
+opts() {
+    vars
+    while getopts d:r:x:p arg
+    do
+        case $arg in
+            d) axed="$OPTARG" ;;
+            r) axerc="$OPTARG" ;;
+            x) XINITRC="$OPTARG" ;;
+            p) axeprof=1 ;;
+            ?) usage; exit 2 ;;
+        esac
+    done
+    export axed axerc XINITRC
+}
+
+main() {
+    env_xdg # required
+    opts
+
+    # finish setting up
+    [ -d "$axed"  ] || die "\$axed not found, supposed to be at $axed"
+    [ -f "$axerc" ] || die "\$axerc not found, supposed to be $axerc"
+    cd $axed
+
+    [ ! -z "$axeprof" ] && env_profile
+
+    . "$axerc"
+    # if we're here, axerc didn't call run_*
+    case "$XDG_SESSION_TYPE" in
+        wayland) run_wayland "$@" ;; # failure on $# inside the function
+        x11)     run_xorg    "$@" ;;
+    esac
+}
+
+# allow sourcing
+[ "x$0" = "x$(which axerc)" ] && main

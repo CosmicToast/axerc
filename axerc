@@ -100,7 +100,7 @@ run_wayland() {
 run_xorg() {
     [ ! -z "$axeprof" ] && env_xprofile
     env_xorg
-    exec xinit "$@"
+    exec startx "$XINITRC" "$@"
 }
 
 # --- main program
@@ -137,7 +137,7 @@ opts() {
 
 main() {
     env_xdg # required
-    opts
+    opts "$@"
 
     # finish setting up
     [ -d "$axed"  ] || die "\$axed not found, supposed to be at $axed"
@@ -155,4 +155,4 @@ main() {
 }
 
 # allow sourcing
-[ "x$0" = "x$(which axerc)" ] && main
+[ "x$0" = "x$(which axerc)" ] && main "$@"

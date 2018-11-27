@@ -122,14 +122,14 @@ vars() {
 
 opts() {
     vars
-    while getopts d:r:x:p arg
+    while getopts hd:r:x:p arg
     do
         case $arg in
             d) axed="$OPTARG" ;;
             r) axerc="$OPTARG" ;;
             x) XINITRC="$OPTARG" ;;
             p) axeprof=1 ;;
-            ?) usage; exit 2 ;;
+            h|?) usage; exit 2 ;;
         esac
     done
     export axed axerc XINITRC

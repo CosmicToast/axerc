@@ -1,0 +1,14 @@
+export XINITRC=~/.xinitrc # undo override
+
+# get profile stuff if it's not handled by axerc
+if [ -z "$axeprof" ]
+then
+    env_profile
+    # xprofile is in my legacy xinitrc
+fi
+
+env_dbus # I do want dbus in my plasma session
+
+run_xorg plasma5
+
+# vim: ft=sh

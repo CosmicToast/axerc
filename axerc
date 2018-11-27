@@ -75,14 +75,14 @@ env_input() {
 env_profile() {
     for file in ~/.profile /etc/profile
     do
-        . $file
+        [ -r $file ] && . $file
     done
 }
 
 env_xprofile() {
     for file in  ~/.xprofile /etc/xprofile
     do
-        . $file
+        [ -r $file ] && . $file
     done
 }
 
